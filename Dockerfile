@@ -1,25 +1,23 @@
-# Use the official Python image as the base image
+# Use an official Python runtime as a base image
 FROM python:3.9-slim
 
 # Set the working directory in the container
-WORKDIR /app
+WORKDIR /usr/src/app
 
-# Copy the requirements file
-COPY requirements.txt .
-
-# Install the Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy the application code
+# Set an environment variable with a default value
+# Copy the current directory contents into the container at /usr/src/app
 COPY . .
 
-# Set the environment variables
-ENV SLACK_APP_TOKEN="xapp-1-A06RWBWMR61-6885791286852-3690e5bdea5a3872c2de849a40ea5223e5b11560e411f6e4d5803b63d5ab4213" \
-    SLACK_BOT_TOKEN="xoxb-291309891525-6883358677458-odX8zeHNfeOl9tQk7j4uzDwe+" \
-    ENCRYPTION_KEY="MLhcQLrN3vEEREfLnX7vZSV1cWMJvdHIvIx4Q5eLmvc="
+# Install any needed packages specified in requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Expose the port (if needed)
-# EXPOSE 5000
+# Make port 3000 available to the world outside this container
+EXPOSE 3000
+EXPOSE 443
+EXPOSE 80
 
-# Run the application
+# Define environment variable
+ENV NAME World
+
+# Run app.py when the container launches
 CMD ["python", "cypher_mate.py"]
