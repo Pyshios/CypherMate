@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  your_service_name:
+    build: .
+    environment:
+      - OTS_API_URL=${OTS_API_URL}
+      - OTS_BASE_URL=${OTS_BASE_URL}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}
+      - OTS_USERNAME=${OTS_USERNAME}
+      - OTS_API_TOKEN=${OTS_API_TOKEN}
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    restart: unless-stopped
