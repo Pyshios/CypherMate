@@ -5,33 +5,30 @@ from cryptography.fernet import Fernet
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 
-# Slack app credentials from environment variables
-# SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")  # App-Level Token with the connections:write permission
-# SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")  # Bot User OAuth Token
+
 
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")
 OTS_USERNAME = os.getenv("OTS_USERNAME")
 OTS_API_TOKEN = os.getenv("OTS_API_TOKEN")
 ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
+OTS_API_URL = os.getenv("OTS_API_URL", "https://onetimesecret.com/api/v1/share")
+OTS_BASE_URL = os.getenv("OTS_BASE_URL", "https://onetimesecret.com/secret/")
 
-# Get the encryption key from the environment variable
-# ENCRYPTION_KEY = os.getenv("ENCRYPTION_KEY")
 
-# Initialize the Slack app
-# Initialize the Slack app
+
+print(SLACK_BOT_TOKEN)
 app = App(token=SLACK_BOT_TOKEN)
 
 def share_secret(secret, ttl=3600, passphrase=None, recipient=None):
     """Stores a secret value using the One-Time Secret API."""
-    url = "https://onetimesecret.com/api/v1/share"
     auth = (OTS_USERNAME, OTS_API_TOKEN)
     data = {'secret': secret, 'ttl': ttl, 'passphrase': passphrase, 'recipient': recipient}
-    response = requests.post(url, data=data, auth=auth)
+    response = requests.post(OTS_API_URL, data=data, auth=auth)
     response.raise_for_status()  # Verify successful request
     return response.json()
 
-@app.command("/password_view")
+@app.command("/get_link")
 def handle_password_command(ack, body, client, logger):
     """Opens the modal for entering password and optional passphrase/recipient."""
     ack()
@@ -82,6 +79,57 @@ def handle_password_command(ack, body, client, logger):
         }
     )
 
+
+@app.command("/encrypt_me")
+def handle_password_command(ack, body, client, logger):
+    """Opens the modal for entering text to encrypt."""
+    ack()
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view={
+            "type": "modal",
+            "callback_id": "encrypt_modal",  # Updated callback_id
+            "title": {"type": "plain_text", "text": "Encrypt Text"},
+            "submit": {"type": "plain_text", "text": "Encrypt"},
+            "close": {"type": "plain_text", "text": "Cancel"},
+            "blocks": [
+                {
+                    "type": "input",
+                    "block_id": "text_block",  # Updated block_id
+                    "element": {"type": "plain_text_input", "action_id": "text_input"},  # Updated action_id
+                    "label": {"type": "plain_text", "text": "Enter your text"}
+                }
+            ]
+        }
+    )
+
+@app.view("encrypt_modal")  # Updated to match the new callback_id
+def handle_modal_submission(ack, body, view, client, logger):
+    """Handles modal submissions for text encryption."""
+    ack()  # Acknowledge the view submission
+    inputs = view["state"]["values"]
+    text_to_encrypt = inputs["text_block"]["text_input"]["value"]  # Retrieve the input text
+
+    try:
+        # Encrypt the text if requested
+        fernet = Fernet(ENCRYPTION_KEY.encode())
+        encrypted_text = fernet.encrypt(text_to_encrypt.encode()).decode()
+        
+        # Sending the encrypted text to the user
+        user_id = body["user"]["id"]
+        client.chat_postEphemeral(
+            channel=user_id,
+            user=user_id,
+            text=f"*Your encrypted text is:* {encrypted_text}"
+        )
+    except Exception as e:
+        logger.error(f"Error encrypting text: {e}")
+        client.chat_postEphemeral(
+            channel=user_id,
+            user=user_id,
+            text="Failed to encrypt the text. Please try again."
+        )
+
 @app.view("password_modal")
 def handle_modal_submission(ack, body, view, client, logger):
     """Handles modal submissions for creating one-time secrets."""
@@ -101,7 +149,7 @@ def handle_modal_submission(ack, body, view, client, logger):
     try:
         secret_response = share_secret(secret=password, passphrase=passphrase, recipient=recipient)
         secret_link = f"https://onetimesecret.com/secret/{secret_response['secret_key']}"
-        message = f"Here's your one-time link: {secret_link}"
+        message = f"*Here's your one-time link:* {secret_link}"
     except Exception as e:
         logger.error(f"Error creating one-time link: {e}")
         message = "Failed to create one-time link. Please try again."
@@ -150,8 +198,8 @@ def handle_modal_submission(ack, body, view, client, logger):
 
     try:
         secret_response = share_secret(secret=password, passphrase=passphrase, recipient=recipient)
-        secret_link = f"https://onetimesecret.com/secret/{secret_response['secret_key']}"
-        message = f"Here's your one-time link: {secret_link}"
+        secret_link = f"{OTS_BASE_URL}{secret_response['secret_key']}"
+        message = f"*Here's your one-time link:* {secret_link}"
     except Exception as e:
         logger.error(f"Error creating one-time link: {e}")
         message = "Failed to create one-time link. Please try again."
@@ -159,7 +207,7 @@ def handle_modal_submission(ack, body, view, client, logger):
     client.chat_postEphemeral(channel=body["user"]["id"], user=body["user"]["id"], text=message)
 
 
-@app.command("/decrypt_password")
+@app.command("/decrypt_me")
 def open_decrypt_modal(ack, body, client):
     ack()
 
