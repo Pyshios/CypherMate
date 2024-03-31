@@ -1,6 +1,6 @@
 version: '3.8'
 services:
-  your_service_name:
+  helper:
     build: .
     environment:
       - OTS_API_URL=${OTS_API_URL}
@@ -11,3 +11,9 @@ services:
       - OTS_API_TOKEN=${OTS_API_TOKEN}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
     restart: unless-stopped
+    ports:
+      - "3000:3000"
+      - "443:443"
+      - "80:80"
+    env_file:
+      - .env
